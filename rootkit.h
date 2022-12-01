@@ -10,6 +10,6 @@
 #define PROC_NET_TCP6 "/proc/net/tcp6"
 
 #define PRELOAD_PATH "/etc/ld.so.preload"
-#define MAGIC_STRING "backdoor"
+#define MAGIC_STRING "rootkit"
 
 #endif
