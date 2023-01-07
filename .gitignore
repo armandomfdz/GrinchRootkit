@@ -1,3 +1,4 @@
 *.so
+*.txt
 test
 test.c
