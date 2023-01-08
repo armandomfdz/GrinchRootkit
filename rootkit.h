@@ -12,7 +12,6 @@
 
 #define PRELOAD_PATH "/etc/ld.so.preload"
 #define MAGIC_STRING "rootkit"
-//#define MAGIC_GID 73377
-#define MAGIC_GID 7
+#define MAGIC_GID 73377
 
 #endif
