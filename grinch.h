@@ -11,7 +11,7 @@
 #define PROC_NET_TCP6 "/proc/net/tcp6"
 
 #define PRELOAD_PATH "/etc/ld.so.preload"
-#define MAGIC_STRING "rootkit"
+#define MAGIC_STRING "grinch"
 #define MAGIC_GID 73377
 
 #endif

