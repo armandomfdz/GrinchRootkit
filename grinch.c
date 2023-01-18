@@ -161,7 +161,6 @@ FILE* fopen64(const char *path, const char *mode) {
 int execve(const char *path, char *const argv[], char *const envp[]) {
     if(old_execve == NULL) old_execve = dlsym(RTLD_NEXT, "execve");
 
-    printf("%s\n", path);
     if(strstr(path, LD_LIBRARY) != NULL) {
         if(old_unlink == NULL) old_unlink = dlsym(RTLD_NEXT, "unlink");
         
