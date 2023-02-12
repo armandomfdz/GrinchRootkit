@@ -2,6 +2,7 @@
 #define _CONFIG_H_
 
 #define REMOTE_ADDR_4 "192.168.33.1"
+#define REMOTE_ADDR_6 "08:00:27:c5:ee:8f"
 #define REMOTE_PORT 443
 #define LOCAL_PORT 60377
 #define HEX_PORT "EBD9"

