@@ -17,5 +17,6 @@ Currently developing:
   Improving authentication (username & password, or 2FA).
   
 Currently fixing:
+  Handling STDERR when a wrong command is introduced.
   Fails re-implant rootkit, when deleting to avoid 'ldd' binary shared library detection.
-  Hiding backdoor process (when non-root user activates) from 'ps' and similar binaries (that use 'lstat', 'fstat', 'stat',... functions) .
+  Hiding backdoor process (when non-root user activates) from 'ps' and similar binaries (that use 'lstat', 'fstat', 'stat',... functions).
