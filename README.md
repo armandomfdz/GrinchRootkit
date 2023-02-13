@@ -1,5 +1,8 @@
 # GrinchRootkit
 User-space rootkit, which hooks successfully several glibc functions. 
+
+Install pre-requisites: 'apt install -y libssl-dev'
+
 The backdoor triggers when the 'puts' function receives the MAGIC_STRING (defined in grinch.h) and the reverse shell connects through a TLS tunnel.
 To connect with temporary certificates: 'ncat --ssl --listen --verbose --nodns <port>'
 
