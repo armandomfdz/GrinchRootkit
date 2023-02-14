@@ -1,4 +1,4 @@
-OPTS=-Wall -fPIC -shared -ldl
+OPTS=-Wall -fPIC -shared -lssl -lcrypto -ldl
 
 all:
 	gcc -o grinch.so grinch.c ${OPTS}
