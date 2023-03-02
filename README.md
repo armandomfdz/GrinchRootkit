@@ -1,5 +1,4 @@
 # GrinchRootkit
-User-space rootkit, which hooks successfully several glibc functions. 
 
 Install pre-requisites: 'apt install -y libssl-dev'
 
