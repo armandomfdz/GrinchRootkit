@@ -18,4 +18,6 @@
 #define MAGIC_STRING "grinch"
 #define MAGIC_GID 73377
 
+#define BUFFER_LENGTH 4096
+
 #endif
